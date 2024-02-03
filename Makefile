@@ -1,5 +1,5 @@
 
-CC = gcc
+CC = g++
 BDIR = build
 OUT = circuit
 SRCDIR = src

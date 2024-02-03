@@ -1,14 +1,15 @@
 
 
-
+#include <algorithm>
 #include <cstddef>
+#include <iostream>
+#include <iterator>
 #include <raylib.h>
 #include <vector>
 
 
 const int WIDTH = 1280;
 const int HEIGHT = 720;
-
 
 
 enum IoType
@@ -33,70 +34,84 @@ struct Signal
 };
 
 
+
+
 class CNode 
 {
 
 private:
-    std::vector<Signal*> inputs;
-    std::vector<Signal*> outputs;
-
+    size_t mid;
+    Vector2 position = { 0.0, 0.0 };
+    std::vector<size_t> signals;
+    
 public:
     
-    void add_input(Signal* sp) { inputs.push_back(sp); }
-    void add_output(Signal* sp) { outputs.push_back(sp); }
+    CNode(Vector2 pos)
+    {
+        position = pos;
+    }
 
+    void add_signal(size_t sid) { signals.push_back(sid); }
+
+
+    std::vector<size_t>& get_signals() { return signals; }
+
+    
 };
 
 
-class SignalRegister
+class Register
 {
-    
+
 private:
-
-    size_t sigctn = 0;
-
+    std::vector<CNode> nodes;
     std::vector<Signal> signals;
  
-public:
 
-    Signal* register_signal(IoType t, size_t mid, IoLevel lvl, Signal* connect = nullptr) 
+public:
+    
+
+    size_t register_signal(IoType t, size_t mid, IoLevel lvl, Signal* connect = nullptr) 
     {
-        signals.push_back(Signal { sigctn, mid, t, lvl, connect });
-        sigctn++;
-        return &signals.back();
+        signals.push_back(Signal { signals.size(), mid, t, lvl, connect });
+        return signals.size() - 1;
     }
     
 
-    std::vector<Signal*> get_module_signal(size_t mid) 
-    { 
-        
-        std::vector<Signal*> out;
+    size_t register_node(Vector2 start_pos)
+    {
+        nodes.push_back(CNode(start_pos));    
+        return nodes.size() - 1;
+    }
+    
 
-        for (auto sp : signals) {
-            
-            if (sp.lvl == IoLevel::Module && sp.mid == mid ) {
-                out.push_back(&sp);
-            }
+    void add_signal_to_node(size_t nid, size_t mid, IoType t, IoLevel lvl)
+    {
+        
+        size_t sid = register_signal(t, mid,lvl);
+        nodes[nid].add_signal(sid); 
+        
+    }   
+
+    CNode* get_node(size_t nid) { return &nodes[nid]; }
+    std::vector<Signal*> get_signals(std::vector<size_t>& sids) 
+    { 
+        std::vector<Signal*> output;
+        
+        for ( auto sid : sids ) {
+            output.push_back(&signals[sid]);
         }
 
-        return out;
+        return output; 
 
     }
+    
+
 
 };
 
 
-class NodeRegister
-{
-
-private:
-    size_t node_ctn = 0;
-    std::vector<CNode> nodes;
-
-};
-
-
-class Module 
+class CModule 
 {
 
 private:
@@ -106,26 +121,77 @@ private:
 public:
     
 
-    void add_node(SignalRegister& sreg)
+    void add_node(Register& reg)
     {
+        
+        // tmp 
+
+        size_t node = reg.register_node({400.f, 400.f });
+            
+        reg.add_signal_to_node(node, mid, IoType::Input, IoLevel::Node);
+        reg.add_signal_to_node(node, mid, IoType::Input, IoLevel::Node);
+        reg.add_signal_to_node(node, mid, IoType::Output, IoLevel::Node);
+
+        // ====
+        
+        nodes.push_back(node);
 
     }
+
+    std::vector<size_t>& get_nodes() { return nodes; }
 
 
 };
 
 
+// ==== Helper function
+
+
+
+
+
+
 // ==== Draw 
 
 
+void render_node(size_t nid, Register& reg)
+{
+    // gather content
+    CNode* node = reg.get_node(nid);
+    std::vector<Signal*> signals = reg.get_signals(node->get_signals());
+    
+    std::vector<Signal*> input;
+    std::vector<Signal*> output;
+
+    std::copy_if(signals.begin(),signals.end(), std::back_inserter(input) ,[](Signal* s) { return s->t == IoType::Input; });
+    std::copy_if(signals.begin(),signals.end(),std::back_inserter(output),[](Signal* s) { return s->t == IoType::Output; });
+
+    
+    std::cout << "Node with id: " << nid << " have:\n";
+    std::cout << "  output: " << output.size() << "\n";
+    std::cout << "  input: " << input.size() << "\n";
+
+
+}
+
+
+// ====
 
 
 int main(void)
 {
    
+    CModule mod;
+    Register reg;
+    
+    mod.add_node(reg);
+    
 
-
-   // InitWindow(WIDTH, HEIGHT, "Circuit");
+    for (auto nid : mod.get_nodes()) {
+        render_node(nid, reg);
+    }
+   
+    // InitWindow(WIDTH, HEIGHT, "Circuit");
 
    // while (!WindowShouldClose()) {
 
