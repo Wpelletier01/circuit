@@ -5,12 +5,45 @@
 #include <iostream>
 #include <iterator>
 #include <raylib.h>
+#include <raymath.h>
 #include <vector>
 
+
+
+// ==== DECLARATION
 
 const int WIDTH = 1280;
 const int HEIGHT = 720;
 
+// TMP 
+const float NODE_W = 50.f;
+const float SIGNAL_RADIUS = 5.f; 
+
+const Color NODE_COLOR = { 75, 94, 80, 255};
+const Color SIGNAL_COLOR = { 20, 20, 20, 255 };
+
+const float SIGNAL_PADDING = 5.f;
+
+// 
+
+// ==== Helper function
+float get_signal_area(int nb_signals) 
+{ 
+    
+    float signal_part = nb_signals * (SIGNAL_RADIUS*2);
+    
+    float padding_part = 0;
+
+    // When only one, no padding space to calculate
+    if (nb_signals > 1) { 
+        padding_part = (nb_signals - 1) * SIGNAL_PADDING;
+    }
+
+    return signal_part + padding_part;
+}
+
+
+// ====
 
 enum IoType
 {
@@ -40,23 +73,51 @@ class CNode
 {
 
 private:
-    size_t mid;
-    Vector2 position = { 0.0, 0.0 };
-    std::vector<size_t> signals;
     
+    size_t                  mid;
+    Vector2                 position = { 0.0, 0.0 };
+    Vector2                 size = { NODE_W, SIGNAL_RADIUS*2};
+    bool                    selected = false;
+    std::vector<size_t>     signals;
+
+
+    void update_size()
+    {
+        size_t bigger = std::max(nb_output,nb_input);
+        
+        size.y = get_signal_area(bigger);
+
+    }
+
 public:
-    
+   
+    size_t nb_input = 0;
+    size_t nb_output = 0;
+
+
+
     CNode(Vector2 pos)
     {
         position = pos;
     }
 
-    void add_signal(size_t sid) { signals.push_back(sid); }
-
+    void add_signal(size_t sid) 
+    { 
+        signals.push_back(sid); 
+        update_size();
+    }
+    
+    void set_selected(bool s) { selected = s; }
+    void set_position(Vector2 offset) { position = Vector2Add(position, offset); }
 
     std::vector<size_t>& get_signals() { return signals; }
 
-    
+    bool is_selected() { return selected; }
+
+    Vector2& get_position() { return position; }
+    Vector2& get_size() { return size; }
+    Rectangle get_rectangle() { return { position.x, position.y, size.x, size.y}; }
+
 };
 
 
@@ -67,7 +128,6 @@ private:
     std::vector<CNode> nodes;
     std::vector<Signal> signals;
  
-
 public:
     
 
@@ -88,6 +148,9 @@ public:
     void add_signal_to_node(size_t nid, size_t mid, IoType t, IoLevel lvl)
     {
         
+        if ( t == IoType::Input) nodes[nid].nb_input++;
+        else nodes[nid].nb_output++;
+
         size_t sid = register_signal(t, mid,lvl);
         nodes[nid].add_signal(sid); 
         
@@ -144,12 +207,6 @@ public:
 };
 
 
-// ==== Helper function
-
-
-
-
-
 
 // ==== Draw 
 
@@ -160,19 +217,81 @@ void render_node(size_t nid, Register& reg)
     CNode* node = reg.get_node(nid);
     std::vector<Signal*> signals = reg.get_signals(node->get_signals());
     
-    std::vector<Signal*> input;
-    std::vector<Signal*> output;
+    std::vector<Signal*> inputs;
+    std::vector<Signal*> outputs;
 
-    std::copy_if(signals.begin(),signals.end(), std::back_inserter(input) ,[](Signal* s) { return s->t == IoType::Input; });
-    std::copy_if(signals.begin(),signals.end(),std::back_inserter(output),[](Signal* s) { return s->t == IoType::Output; });
+    std::copy_if(signals.begin(),signals.end(), std::back_inserter(inputs) ,[](Signal* s) { return s->t == IoType::Input; });
+    std::copy_if(signals.begin(),signals.end(),std::back_inserter(outputs),[](Signal* s) { return s->t == IoType::Output; });
+
+    // Draw node body
+    Vector2 node_pos = node->get_position();
+    Vector2 node_size = node->get_size();
+    DrawRectangleV(node_pos,node_size,NODE_COLOR);
+    
+    // Draw node's input 
+
+    float posy = ((node_size.y / 2.f) - (get_signal_area(inputs.size()) / 2.f)) + node_pos.y + SIGNAL_RADIUS;
+
+    for (const auto input : inputs ) {
+        
+        DrawCircleV({node_pos.x + SIGNAL_RADIUS, posy},SIGNAL_RADIUS,SIGNAL_COLOR); 
+        posy += (SIGNAL_RADIUS*2) + SIGNAL_PADDING;
+      
+    }
+    
+    // Draw node output 
+
+    posy = ((node_size.y / 2.f) - (get_signal_area(outputs.size()) / 2.f)) + node_pos.y + SIGNAL_RADIUS;
+
+    for ( const auto output : outputs) {
+
+        DrawCircleV({(node_pos.x + node_size.x) - SIGNAL_RADIUS, posy},SIGNAL_RADIUS,SIGNAL_COLOR); 
+        posy += (SIGNAL_RADIUS*2) + SIGNAL_PADDING;
+    
+
+    }
 
     
-    std::cout << "Node with id: " << nid << " have:\n";
-    std::cout << "  output: " << output.size() << "\n";
-    std::cout << "  input: " << input.size() << "\n";
+}
+
+
+// ==== Update and Logic
+
+
+void mouse_input(size_t nid, Register& reg)
+{
+    
+    CNode* node = reg.get_node(nid);
+    
+
+    // Check if touch node 
+    if (CheckCollisionPointRec(GetMousePosition(), node->get_rectangle()) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        node->set_selected(true);
+        std::cout << "you select node id: " << nid << "\n";
+
+    } else if (node->is_selected() && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        node->set_position(GetMouseDelta());
+        std::cout << "you move node id: " << nid << "\n";
+    } else {
+        node->set_selected(false);
+    }
+
 
 
 }
+
+
+void update(CModule& mod, Register& reg)
+{
+    
+    for ( auto nid : mod.get_nodes()) {
+
+        mouse_input(nid, reg);
+
+    }
+
+}
+
 
 
 // ====
@@ -185,26 +304,27 @@ int main(void)
     Register reg;
     
     mod.add_node(reg);
-    
+ 
+    InitWindow(WIDTH, HEIGHT, "Circuit");
 
-    for (auto nid : mod.get_nodes()) {
-        render_node(nid, reg);
+    while (!WindowShouldClose()) {
+       
+
+        update(mod,reg);
+
+        
+        BeginDrawing();
+           
+            ClearBackground(GRAY);
+            for (auto nid : mod.get_nodes()) {
+                render_node(nid, reg);
+            }
+
+        EndDrawing();
+
     }
-   
-    // InitWindow(WIDTH, HEIGHT, "Circuit");
 
-   // while (!WindowShouldClose()) {
-
-   //     
-   //     BeginDrawing();
-   //         
-   //         ClearBackground(GRAY);
-
-   //     EndDrawing();
-
-   // }
-
-   // CloseWindow();
+    CloseWindow();
 
     return 0;
 }
