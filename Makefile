@@ -3,35 +3,29 @@
 CXX := g++
 CXXFLAGS := -std=c++11 -g -Wall -Wno-unused -Wunused-function
 LFLAGS = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
+
 TARGET := circuit
 BDIR = build
-SRC_DIR := src
+SRCDIR = src
 
-# Find all .cpp files in the source directory and its subdirectories
-SRCS := $(shell find $(SRC_DIR) -type f -name "*.cpp")
-
-# Define the object files corresponding to each source file
-OBJS := $(SRCS:.cpp=.o)
+SOURCES := $(shell find $(SRCDIR) -name "*.cpp")
+OBJECTS := $(patsubst %.c, %.o, $(SOURCES))
 
 
-# Default target, build the executable
 all: $(TARGET)
 
-# Rule to build the executable
-$(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LFLAGS)
-	@echo "### EXECUTION ###"
-	./$(TARGET)	
-	@echo "### END ###"
 
+$(TARGET): $(OBJECTS)
+	$(CXX) $^ -o $(BDIR)/$@ $(CXXFLAGS) $(LFLAGS)
+	
+	@echo ######## START EXEC ######## 
+	$(BDIR)/$(TARGET)
+	@echo ######## END EXEC ######## 
 
-# Rule to compile each source file into object files
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Clean rule to remove compiled files
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(BDIR)/*
 
 # Phony target to avoid conflicts with file names
 .PHONY: all clean
