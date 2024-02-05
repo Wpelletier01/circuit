@@ -37,8 +37,7 @@ void update(CModule& mod, Register& reg)
 
 
 
-// ====
-
+// ===
 
 int main(void)
 {

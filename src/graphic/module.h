@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "primitive.h"
+#include "../core/primitive.h"
 #include "register.h"
 
 class CModule 

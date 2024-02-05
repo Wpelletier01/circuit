@@ -7,7 +7,6 @@
 #include "declaration.h"
 #include "module.h"
 #include "node.h"
-#include "primitive.h"
 #include "register.h"
 #include "util.h"
 

@@ -1,9 +1,10 @@
 #pragma once
 
+
 #include <vector>
 #include <raylib.h>
 
-#include "primitive.h"
+#include "../core/primitive.h"
 #include "node.h"
 
 
@@ -13,7 +14,6 @@ class Register
 private:
     std::vector<CNode> nodes;
     std::vector<Signal> signals;
-    std::vector<Wire> wires;
  
 public:
     
