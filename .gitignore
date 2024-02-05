@@ -1,4 +1,3 @@
-src/*.o
 circuit
 build/
 backup/
