@@ -1,34 +1,37 @@
 
-CC = g++
-BDIR = build
-OUT = circuit
-SRCDIR = src
-OBJDIR = .obj
-EXT = .cpp
 
+CXX := g++
+CXXFLAGS := -std=c++11 -g -Wall -Wno-unused -Wunused-function
 LFLAGS = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
-CFLAGS = -g -Wall -Wno-unused -Wunused-function 
+TARGET := circuit
+BDIR = build
+SRC_DIR := src
 
-# EXECUTION
+# Find all .cpp files in the source directory and its subdirectories
+SRCS := $(shell find $(SRC_DIR) -type f -name "*.cpp")
 
-FILES := $(wildcard $(SRCDIR)/*$(EXT))
-OBJS := $(patsubst $(SRCDIR)/%.cpp,$(BDIR)/$(OBJDIR)/%.o,$(FILES))
+# Define the object files corresponding to each source file
+OBJS := $(SRCS:.cpp=.o)
 
-## Main
-all: $(OBJS)
-	$(CC) $(CFLAGS) -o $(BDIR)/$(OUT) $(OBJS) $(LFLAGS)
+
+# Default target, build the executable
+all: $(TARGET)
+
+# Rule to build the executable
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LFLAGS)
 	@echo "### EXECUTION ###"
-	./$(BDIR)/$(OUT)	
+	./$(BDIR)/$($TARGET)	
 	@echo "### END ###"
-	rm -r $(BDIR)
-	
 
 
-## Object
-$(BDIR)/$(OBJDIR)/%.o: $(SRCDIR)/%$(EXT)
-	mkdir -p $(BDIR)/$(OBJDIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
+# Rule to compile each source file into object files
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-.PHONY: clean
+# Clean rule to remove compiled files
 clean:
-	rm -rf $(BDIR)
+	rm -f $(OBJS) $(TARGET)
+
+# Phony target to avoid conflicts with file names
+.PHONY: all clean
