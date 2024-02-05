@@ -9,7 +9,7 @@
 
 void mouse_input(size_t nid, Register& reg)
 {
-    
+        
     CNode* node = reg.get_node(nid);
     
     // Check if touch node 
@@ -41,7 +41,10 @@ void update(CModule& mod, Register& reg)
 
 int main(void)
 {
-   
+
+ 
+
+
     CModule mod;
     Register reg;
     

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <raylib.h>
 
 using SignalID = size_t;
@@ -35,7 +36,7 @@ struct Signal
     size_t      mid;
     IoType      t;
     IoLevel     lvl;
-    bool        activate;
+    uint8_t     activate;
     size_t      connect;
 };
 

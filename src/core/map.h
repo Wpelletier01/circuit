@@ -15,9 +15,9 @@ private:
     std::vector<Signal> signals; 
     std::vector<LGate>  lgates;
 
-    SignalID add_lgate_signal();
+    SignalID add_lgate_signal(IoType t);
 
-    void update_lgates();
+    void update_lgate(size_t index);
 
 public:
 
