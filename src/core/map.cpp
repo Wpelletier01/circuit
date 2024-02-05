@@ -96,3 +96,10 @@ void Map::update()
 {
 
 }
+
+std::vector<LGate>& Map::get_lgates() { return lgates; }
+
+Signal* Map::get_signal(SignalID sid) { return &signals[sid-1]; }   
+
+
+

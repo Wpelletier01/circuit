@@ -24,9 +24,12 @@ public:
     // IO of the map itself
     void add_maps_signal(IoType);
     void add_lgate(LGateType t);
-   
+    
 
     void update();
+    
+    std::vector<LGate>& get_lgates();
+    Signal* get_signal(SignalID sid);
 
 };
 
