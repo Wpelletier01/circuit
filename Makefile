@@ -21,7 +21,7 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LFLAGS)
 	@echo "### EXECUTION ###"
-	./$(BDIR)/$($TARGET)	
+	./$(TARGET)	
 	@echo "### END ###"
 
 
