@@ -15,11 +15,12 @@ class App
 {
   
 private:
+
     class Register  reg;
     class Map       map;
+    Camera2D        camera = {0};
 
-
-    void node_mouse_selection(Rect* rect, std::vector<Circle*> circles, Text* text)
+    void node_mouse_selection(size_t id, Rect* rect, std::vector<Circle*> circles, Text* text)
     {    
      
         Vector2 mpos = GetMousePosition();
@@ -39,14 +40,33 @@ private:
             
             Vector2 offset = GetMouseDelta();
 
-            rect->dinfo.position = Vector2Add(rect->dinfo.position,offset);
+            Vector2 bloc = Vector2Add(rect->dinfo.position,offset); 
+            
+            std::vector<Rectangle> others = reg.get_nodes_position(id);
+            Rectangle node_dimension = {rect->dinfo.position.x,rect->dinfo.position.y,rect->size.x,rect->size.y};
+            
+            bool collide = false;
 
-            for ( auto circle : circles) {
-                circle->dinfo.position = Vector2Add(circle->dinfo.position,offset);
+
+            for ( auto other : others) {
+                
+                if (CheckCollisionRecs(node_dimension, other)) {
+                    collide = true;
+                    break;
+                }
             }
             
-            text->dinfo.position = Vector2Add(text->dinfo.position,offset);
+            if (!collide) {
+                rect->dinfo.position = bloc;
 
+                for ( auto circle : circles) {
+                    circle->dinfo.position = Vector2Add(circle->dinfo.position,offset);
+                }
+            
+                text->dinfo.position = Vector2Add(text->dinfo.position,offset);
+
+                
+            }
 
         } else {
             rect->dinfo.selected = false;
@@ -71,7 +91,7 @@ private:
             std::vector<Circle*> circles = reg.get_circles_by_id(lgate.id);
             Text* text = reg.get_text_by_id(lgate.id);
 
-            node_mouse_selection(rect,circles,text);
+            node_mouse_selection(lgate.id,rect,circles,text);
         }
 
 
@@ -79,8 +99,8 @@ private:
 
 
 public:
-
     
+     
     void update()
     {
     

@@ -4,6 +4,8 @@
 void Register::register_node(size_t id, std::string name, int nb_input, int nb_output, Vector2 start)
 {
     
+    // TODO: try to place the text in the center 
+
     // determine height of the node
     int bigger = std::max(nb_input,nb_output);
     
@@ -19,25 +21,26 @@ void Register::register_node(size_t id, std::string name, int nb_input, int nb_o
     float posy = ((size.y / 2.f) - (get_signal_area(nb_input) / 2.f)) + start.y + SIGNAL_RADIUS;
 
     for (int i = 0; i < nb_input; i++) {
-        circles.push_back({{id,{start.x+SIGNAL_RADIUS,posy},false},SIGNAL_RADIUS});
+        circles.push_back({{id,{start.x+SIGNAL_RADIUS,posy},OType::NODE,false},SIGNAL_RADIUS});
         posy += (SIGNAL_RADIUS*2) + SIGNAL_PADDING;
     }
     
     posy = ((size.y / 2.f) - (get_signal_area(nb_output) / 2.f)) + start.y + SIGNAL_RADIUS;
     
     for (int i = 0; i < nb_output; i++) {
-        circles.push_back({{id,{(start.x + size.x) - SIGNAL_RADIUS,posy},false},SIGNAL_RADIUS});
+        circles.push_back({{id,{(start.x + size.x) - SIGNAL_RADIUS,posy},OType::NODE,false},SIGNAL_RADIUS});
         posy += (SIGNAL_RADIUS*2) + SIGNAL_PADDING;
     }
 
     // register rect  
-    rects.push_back({{id,start,false},size});
+    rects.push_back({{id,start,OType::NODE,false},size});
     // register text 
     texts.push_back(
         {
             {
                 id,
                 {(size.x/2) - (NODE_TEXT_SIZE.x/2) + start.x + NODE_TEXT_PADDING_X,start.y + NODE_TEXT_PADDING_Y},
+                OType::NODE,
                 false
             },
             name,
@@ -86,3 +89,18 @@ Text* Register::get_text_by_id(size_t id)
 std::vector<Circle>& Register::get_circles() { return circles; }
 std::vector<Rect>& Register::get_rects() { return rects; }
 std::vector<Text>& Register::get_texts() { return texts; }
+
+std::vector<Rectangle> Register::get_nodes_position(size_t skip)
+{
+    
+    std::vector<Rectangle> positions;
+     
+    for ( auto rect : rects) {
+        if (rect.dinfo.otype == OType::NODE && rect.dinfo.parent != skip) { 
+            positions.push_back({rect.dinfo.position.x,rect.dinfo.position.y,rect.size.x,rect.size.y});
+        }
+    }
+
+    return positions;
+
+}

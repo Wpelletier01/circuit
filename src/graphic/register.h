@@ -31,4 +31,5 @@ public:
     std::vector<Rect>& get_rects();
     std::vector<Text>& get_texts();
 
+    std::vector<Rectangle> get_nodes_position(size_t skip);
 };

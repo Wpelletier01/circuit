@@ -8,12 +8,20 @@
 
 #include "declaration.h"
 
+
+enum OType
+{
+    NODE
+};
+
 struct DrawInfo 
 {
     size_t      parent;
     Vector2     position;
+    OType       otype;
     bool        selected;
 };
+
 
 
 struct Circle 
