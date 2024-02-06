@@ -47,5 +47,11 @@ struct Text
 };
 
 
+struct Wire 
+{
+    DrawInfo    dinfo;
+    size_t      pa;
+    size_t      pb;
+};
 
 

@@ -1,4 +1,5 @@
 
+#include <iostream>
 #include <raylib.h>
 #include <raymath.h> 
 
@@ -43,7 +44,7 @@ private:
             Vector2 bloc = Vector2Add(rect->dinfo.position,offset); 
             
             std::vector<Rectangle> others = reg.get_nodes_position(id);
-            Rectangle node_dimension = {rect->dinfo.position.x,rect->dinfo.position.y,rect->size.x,rect->size.y};
+            Rectangle node_dimension = {bloc.x,bloc.y,rect->size.x,rect->size.y};
             
             bool collide = false;
 
@@ -64,9 +65,10 @@ private:
                 }
             
                 text->dinfo.position = Vector2Add(text->dinfo.position,offset);
+ 
+            } 
 
-                
-            }
+
 
         } else {
             rect->dinfo.selected = false;
@@ -80,6 +82,33 @@ private:
 
     }
     
+    bool collide_w_signal(std::vector<Circle*> circles) 
+    {
+        
+        Vector2 mpos = GetMousePosition();
+
+        for (size_t i = 0; i < circles.size(); i++) {
+            
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointCircle(mpos,circles[i]->dinfo.position,circles[i]->radius)) {
+                std::cout << "you collide with a circle\n";
+                circles[i]->dinfo.selected = true;
+
+                return true;
+            } else if (circles[i]->dinfo.selected && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                    
+                reg.register_wirring(circles[i]);
+
+                return true;
+            } else if (circles[i]->dinfo.selected) {
+                
+                reg.register_wirring(nullptr);
+                circles[i]->dinfo.selected = false;
+            }
+        }
+
+        return false;
+
+    }
 
     void update_nodes()
     {
@@ -90,8 +119,11 @@ private:
             Rect* rect = reg.get_rect_by_id(lgate.id);
             std::vector<Circle*> circles = reg.get_circles_by_id(lgate.id);
             Text* text = reg.get_text_by_id(lgate.id);
+            
 
-            node_mouse_selection(lgate.id,rect,circles,text);
+            if (!collide_w_signal(circles)) node_mouse_selection(lgate.id,rect,circles,text);
+        
+
         }
 
 
@@ -125,7 +157,14 @@ public:
         }
 
         // ===
-
+            
+        // Render Wirring signal
+        
+        Circle* from_wire = reg.get_wirring();
+        
+        if (from_wire) {
+            DrawLineBezier(from_wire->dinfo.position, GetMousePosition(), 5.f, BLACK);
+        } 
     
 
     }
