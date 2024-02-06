@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <raylib.h>
+#include <string>
 
 #include "declaration.h"
 
@@ -22,12 +23,19 @@ struct Circle
     
 };
 
-
 struct Rect 
 {
     DrawInfo    dinfo;
     Vector2     size;
 
+};
+
+
+struct Text 
+{
+    DrawInfo    dinfo;
+    std::string data;
+    Vector2     size;
 };
 
 

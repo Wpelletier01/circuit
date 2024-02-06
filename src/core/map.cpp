@@ -75,7 +75,7 @@ void Map::add_maps_signal(IoType t)
 }
 
 
-void Map::add_lgate(LGateType t)
+size_t Map::add_lgate(LGateType t)
 {
 
     SignalID xinput = add_lgate_signal(IoType::Input);
@@ -87,7 +87,11 @@ void Map::add_lgate(LGateType t)
     
     SignalID output = add_lgate_signal(IoType::Output);
 
-    lgates.push_back({t,xinput,yinput,output});
+    lgates.push_back({lgctn,t,xinput,yinput,output});
+    
+    lgctn++;
+
+    return lgctn - 1;
     
 }
 

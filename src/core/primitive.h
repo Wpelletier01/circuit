@@ -43,10 +43,11 @@ struct Signal
 
 struct LGate
 {
-    LGateType t;
-    SignalID xinput;
-    SignalID yinput;
-    SignalID output;
+    size_t      id;
+    LGateType   t;
+    SignalID    xinput;
+    SignalID    yinput;
+    SignalID    output;
 };
 
 

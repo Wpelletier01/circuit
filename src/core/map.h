@@ -11,7 +11,9 @@ class Map
 private:
     
     size_t              map_id = 0;
+
     SignalID            sctn = 1;
+    size_t              lgctn = 1;
     std::vector<Signal> signals; 
     std::vector<LGate>  lgates;
 
@@ -23,7 +25,7 @@ public:
 
     // IO of the map itself
     void add_maps_signal(IoType);
-    void add_lgate(LGateType t);
+    size_t add_lgate(LGateType t);
     
 
     void update();
