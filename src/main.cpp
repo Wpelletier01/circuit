@@ -123,7 +123,8 @@ struct Link
     LinkType            type;
      
     Rectangle           rect = {0.f, 0.f, LINK_SIZE, LINK_SIZE};
-    
+    Vector2             offset = {0.f, 0.f};
+
     std::vector<Link*>  parents;
     std::vector<Link*>  children;
 
@@ -136,16 +137,43 @@ struct Link
         rect.x = pos.x;
         rect.y = pos.y;
     }
-    
-    void mov(Vector2 delta) 
+
+    void set_size(float w, float h)
     {
-        rect.x += delta.x;
-        rect.y += delta.y;
+        rect.width = w;
+        rect.height = h;
+    }
+    
+    void mov() 
+    {
+        rect.x += offset.x;
+        rect.y += offset.y;
     }
 
     Vector2 get_position()
     {
         return { rect.x, rect.y};
+    }
+
+    void add_child(Link *link)
+    {
+        children.push_back(link);
+        update_size();
+    }
+
+    void add_parent(Link *link)
+    {   
+        parents.push_back(link);
+        update_size();
+    }
+    
+    void update_size() 
+    {
+        if (type == LinkType::NODE) {
+            size_t bigger = std::max(children.size(),parents.size());
+            rect.height = get_link_area_height(bigger);
+            rect.x = parents[0]->rect.x;
+        }
     }
 
 };
@@ -156,7 +184,6 @@ struct MapIO
 {
      
     std::vector<Link*>  links;
-    
     Rectangle           background;
 
     
@@ -244,18 +271,45 @@ public:
 
 // Updating === 
 
+void update_position(Link *link)
+{
+
+    link->mov();
+    link->offset = {0.f, 0.f};
+    
+    for (auto child : link->children) update_position(child);
+    
+}
+
+void collision(Link *link) {
+    
+    if (link->type == LinkType::NODE) {
+        
+
+
+        if (link->rect.x + link->offset.x < MAP_IO_BG_SIZE || link->rect.x + link->offset.x + link->rect.width > WIDTH - MAP_IO_BG_SIZE) {
+        
+            link->offset.x = 0.f;   
+            
+            for (auto parent : link->parents) parent->offset.x = 0.f;
+            for (auto child : link->children) child->offset.x = 0.f;
+
+        }
+
+    }
+
+    for (auto child : link->children) collision(child);
+   
+
+}
 
 void move_node(Link *link, Vector2 delta)
 {
-    link->mov(delta);
+    link->offset = delta;
 
-    for (auto parent : link->parents) {
-        parent->mov(delta);
-    }
-   
-    for (auto child : link->children) {
-        child->mov(delta);
-    }
+    for (auto parent : link->parents) parent->offset = delta;
+    for (auto child : link->children) child->offset = delta;
+    
 
 }
 
@@ -272,19 +326,20 @@ void mouse_input(Link *link)
 
     }
 
-    for (auto children : link->children) {
-        mouse_input(link);
-    }
-    
+    for (auto child : link->children) mouse_input(child);
 
 }
 
-void update(struct MapIO min, struct MapIO mout)
+void update(struct MapIO& minput, struct MapIO& mout)
 {
     
-    for ( auto input : min.links) {
-     //   mouse_input(input);
-    }
+    for ( auto input : minput.links) mouse_input(input);
+    
+    // check for collision 
+    for ( auto input : minput.links) collision(input);
+
+    // apply offset
+    for ( auto input : minput.links) update_position(input);
 
 }
 
@@ -309,9 +364,8 @@ void render_link(Link* link)
         
         size_t bigger = std::max(link->children.size(),link->parents.size());
 
-        Rectangle rect = { link->rect.x - LINK_SIZE, link->rect.y, LINK_SIZE * 3, get_link_area_height(bigger)};
         
-        DrawRectangleRec(rect,NODE_COLOR);
+        DrawRectangleRec(link->rect,NODE_COLOR);
 
         // Render Node Link after the background block
         for (auto input : link->parents) {
@@ -381,25 +435,27 @@ int main(void)
     Link *node_output = reg.new_link();
 
 
-    minput.links[0]->children.push_back(node_input);
-    moutput.links[0]->parents.push_back(node_output);
+    minput.links[0]->add_child(node_input);
+    moutput.links[0]->add_parent(node_output);
     
     node_input->type = LinkType::NODE_IO;
     node_input->set_position({ 400.f, 200.f});
-    node_input->parents.push_back(minput.links[0]);
-    node_input->children.push_back(node);
+    node_input->add_parent(minput.links[0]);
+    node_input->add_child(node);
 
 
     node->type = LinkType::NODE;
-    node->set_position({ 420.f, 200.f});
-    node->parents.push_back(node_input);
-    node->children.push_back(node_output);
+    node->set_position({ 416.f, 200.f});
+    node->set_size(3*LINK_SIZE, LINK_SIZE);
+
+    node->add_parent(node_input);
+    node->add_child(node_output);
     
 
     node_output->type = LinkType::NODE_IO;
-    node_output->set_position({ 440.f, 200.f});
-    node_output->parents.push_back(node);
-    node_output->children.push_back(moutput.links[0]);
+    node_output->set_position({ 432.f, 200.f});
+    node_output->add_parent(node);
+    node_output->add_child(moutput.links[0]);
 
 
     InitWindow(WIDTH, HEIGHT, "Circuit");
