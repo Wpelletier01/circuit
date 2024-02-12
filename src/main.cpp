@@ -36,6 +36,7 @@ enum LinkType
     MAP,
     NODE_IO,
     NODE, 
+    IN_DRAW
 };
 
 enum NodeType 
@@ -149,22 +150,21 @@ struct Link
         rect.x += offset.x;
         rect.y += offset.y;
     }
+    
+    void reset_offset() { offset = {0.f, 0.f}; }
 
-    Vector2 get_position()
-    {
-        return { rect.x, rect.y};
-    }
+    Vector2 get_position() { return { rect.x, rect.y}; }
 
     void add_child(Link *link)
     {
         children.push_back(link);
-        update_size();
+        //update_size();
     }
 
     void add_parent(Link *link)
     {   
         parents.push_back(link);
-        update_size();
+        //update_size();
     }
     
     void update_size() 
@@ -174,6 +174,71 @@ struct Link
             rect.height = get_link_area_height(bigger);
             rect.x = parents[0]->rect.x;
         }
+    }
+
+    bool is_not_connected()
+    {
+        if (type == LinkType::NODE_IO) {
+
+            return !children.empty() && !parents.empty();
+        }
+        
+        // the rest is considered connected for now
+        return true;
+    }
+
+    bool has_a_wire_draw()
+    {
+        for (auto child : children) {
+            if ( child->type == LinkType::IN_DRAW) return true;
+        }
+        
+        for (auto parent : parents) {
+            if ( parent->type == LinkType::IN_DRAW) return true;
+        }
+
+        return false;
+    }
+
+    void add_drawing_link(Link *link) { 
+
+        if (children.empty()) children.push_back(link);
+        else parents.push_back(link);
+    }
+
+    void update_drawing_link_position(Vector2 delta) {
+        
+        for ( auto child : children) {
+            if (child->type == LinkType::IN_DRAW) {
+                child->offset = delta;
+                break;
+            }
+        } 
+
+        for ( auto parent : parents) {
+            if (parent->type == LinkType::IN_DRAW) {
+                parent->offset = delta;
+                break;
+            }
+        }
+    }
+
+    void remove_drawing_link()
+    {
+        for (size_t i = 0; i < children.size(); i++) {
+            if (children[i]->type == LinkType::IN_DRAW) {
+                free(children[i]);
+                children.erase(children.begin() + i);
+            }
+        }
+    
+        for (size_t i = 0; i < parents.size(); i++) {
+            if (parents[i]->type == LinkType::IN_DRAW) {
+                free(parents[i]);
+                parents.erase(parents.begin() + i);
+            }
+        }
+    
     }
 
 };
@@ -222,15 +287,11 @@ struct MapIO
 
     void render()
     {
-        
         DrawRectangleRec(background, BACKGROUND); 
-
-
     }
 
     void draw_default_link()
-    {
-        
+    {  
         DrawRectangleV({background.x + LINK_PADDING, (HEIGHT/2.f) - (LINK_SIZE/2.f)},{LINK_SIZE,LINK_SIZE},LINK_COLOR);
     }
 
@@ -275,9 +336,15 @@ void update_position(Link *link)
 {
 
     link->mov();
-    link->offset = {0.f, 0.f};
+    link->reset_offset();
     
     for (auto child : link->children) update_position(child);
+    for (auto parent : link->parents) {
+        if (parent->parents.empty()) {
+            parent->mov();
+            parent->reset_offset();
+        } 
+    }
     
 }
 
@@ -285,10 +352,8 @@ void collision(Link *link) {
     
     if (link->type == LinkType::NODE) {
         
-
-
-        if (link->rect.x + link->offset.x < MAP_IO_BG_SIZE || link->rect.x + link->offset.x + link->rect.width > WIDTH - MAP_IO_BG_SIZE) {
-        
+        // check if node on the I/O platform
+        if (link->rect.x + link->offset.x < MAP_IO_BG_SIZE || link->rect.x + link->offset.x + link->rect.width > WIDTH - MAP_IO_BG_SIZE) {        
             link->offset.x = 0.f;   
             
             for (auto parent : link->parents) parent->offset.x = 0.f;
@@ -324,6 +389,28 @@ void mouse_input(Link *link)
         else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && link->selected) move_node(link,GetMouseDelta());
         else link->selected = false;
 
+    } else if (link->type == LinkType::NODE_IO && link->is_not_connected()) {
+        
+        Vector2 mpos = GetMousePosition();
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mpos,link->rect)) link->selected = true;
+        else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && link->selected) {
+           
+            if(!link->has_a_wire_draw()) {
+                
+                Link *draw = new Link;
+                
+                draw->type = LinkType::IN_DRAW;
+                draw->set_position(GetMousePosition());
+                link->add_drawing_link(draw);
+            } else link->update_drawing_link_position(GetMouseDelta());
+            
+
+        } else {
+            link->selected = false;
+            link->remove_drawing_link();
+        }
+
     }
 
     for (auto child : link->children) mouse_input(child);
@@ -349,6 +436,9 @@ void update(struct MapIO& minput, struct MapIO& mout)
 
 void render_link(Link* link)
 {
+    
+     
+
     if (link->type == LinkType::MAP) {
         
         for (auto child : link->children) {
@@ -433,7 +523,7 @@ int main(void)
     Link *node_input = reg.new_link();
     Link *node = reg.new_link();
     Link *node_output = reg.new_link();
-
+    Link *empty_link = reg.new_link();
 
     minput.links[0]->add_child(node_input);
     moutput.links[0]->add_parent(node_output);
@@ -443,12 +533,18 @@ int main(void)
     node_input->add_parent(minput.links[0]);
     node_input->add_child(node);
 
+    empty_link->type = LinkType::NODE_IO;
+    empty_link->set_position({400.f, 216.f + LINK_PADDING});
+    empty_link->add_child(node);
 
     node->type = LinkType::NODE;
     node->set_position({ 416.f, 200.f});
     node->set_size(3*LINK_SIZE, LINK_SIZE);
 
     node->add_parent(node_input);
+    node->add_parent(empty_link);
+
+
     node->add_child(node_output);
     
 
