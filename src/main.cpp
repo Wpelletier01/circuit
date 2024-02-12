@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <raylib.h>
+#include <raymath.h>
 
 // Declaration ===
 
@@ -15,10 +16,10 @@ const int       HEIGHT = 720;
 const Color     NODE_COLOR = { 75, 94, 80, 255};
 const Vector2   NODE_SIZE = { 50.f, 10.f };
 
-const Color     WIRE_COLOR = BLACK;
+const Color     OFF_COLOR = BLACK;
+
 const float     WIRE_THICKNESS = 5.f;
 
-const float     LINK_RADIUS =  8.f;
 const float     LINK_PADDING = 8.f;
 const float     LINK_SIZE = 16.f;
 const Color     LINK_COLOR = ORANGE;
@@ -26,7 +27,7 @@ const Color     LINK_COLOR = ORANGE;
 // UI
 const Color     BACKGROUND = { 64, 64, 64, 255};
 
-const float     MAP_IO_BG_SIZE = (LINK_RADIUS*2) + (LINK_RADIUS*2);
+const float     MAP_IO_BG_SIZE = LINK_SIZE + (LINK_PADDING*2);
 
 // DATA TYPE ===
 
@@ -109,6 +110,8 @@ float get_link_area_height(int nb_signals)
     return signal_part + padding_part;
 }
 
+Vector2 get_rect_center(Rectangle rect) { return { (rect.width / 2) + rect.x, (rect.height / 2) + rect.y};}
+
 // ===
 
 
@@ -133,7 +136,12 @@ struct Link
         rect.x = pos.x;
         rect.y = pos.y;
     }
-
+    
+    void mov(Vector2 delta) 
+    {
+        rect.x += delta.x;
+        rect.y += delta.y;
+    }
 
     Vector2 get_position()
     {
@@ -237,10 +245,46 @@ public:
 // Updating === 
 
 
+void move_node(Link *link, Vector2 delta)
+{
+    link->mov(delta);
+
+    for (auto parent : link->parents) {
+        parent->mov(delta);
+    }
+   
+    for (auto child : link->children) {
+        child->mov(delta);
+    }
+
+}
+
+void mouse_input(Link *link)
+{
+    
+    if (link->type == LinkType::NODE) {
+        
+        Vector2 mpos = GetMousePosition();
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mpos,link->rect)) link->selected = true;
+        else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && link->selected) move_node(link,GetMouseDelta());
+        else link->selected = false;
+
+    }
+
+    for (auto children : link->children) {
+        mouse_input(link);
+    }
+    
+
+}
+
 void update(struct MapIO min, struct MapIO mout)
 {
     
-
+    for ( auto input : min.links) {
+     //   mouse_input(input);
+    }
 
 }
 
@@ -252,27 +296,30 @@ void render_link(Link* link)
 {
     if (link->type == LinkType::MAP) {
         
-        DrawRectangleRec(link->rect,LINK_COLOR);
         for (auto child : link->children) {
-            DrawLineBezier(link->get_position(),child->get_position(),5.f,WHITE);
+
+            DrawLineBezier(get_rect_center(link->rect),get_rect_center(child->rect),WIRE_THICKNESS,OFF_COLOR);
             render_link(child);
         }
+
+        DrawRectangleRec(link->rect,OFF_COLOR);
 
 
     } else if (link->type == LinkType::NODE) {
         
         size_t bigger = std::max(link->children.size(),link->parents.size());
-        Rectangle rect = { 400.f - LINK_RADIUS, 200.f - LINK_RADIUS, 55.f, get_link_area_height(bigger)};
+
+        Rectangle rect = { link->rect.x - LINK_SIZE, link->rect.y, LINK_SIZE * 3, get_link_area_height(bigger)};
         
         DrawRectangleRec(rect,NODE_COLOR);
 
         // Render Node Link after the background block
         for (auto input : link->parents) {
-            if (input->type == LinkType::NODE_IO) DrawRectangleRec(input->rect,LINK_COLOR);
+            if (input->type == LinkType::NODE_IO) DrawRectangleRec(input->rect,OFF_COLOR);
         }
 
         for (auto output : link->children) {
-            if (output->type == LinkType::NODE_IO) DrawRectangleRec(output->rect, LINK_COLOR);
+            if (output->type == LinkType::NODE_IO) DrawRectangleRec(output->rect, OFF_COLOR);
             
             render_link(output);
         }
@@ -280,7 +327,8 @@ void render_link(Link* link)
         
     } else {
         for (auto child : link->children) {
-            if (child->type != LinkType::NODE) DrawLineBezier(link->get_position(),child->get_position(),5.f,WHITE);
+            if (child->type != LinkType::NODE) DrawLineBezier(get_rect_center(link->rect),get_rect_center(child->rect),WIRE_THICKNESS,OFF_COLOR);
+
             render_link(child);
         }
     }
@@ -359,14 +407,13 @@ int main(void)
     while (!WindowShouldClose()) {
 
         // update
-       // update(root1);
+        update(minput,moutput);
         // ===
 
         BeginDrawing();
 
             ClearBackground(GRAY);
             render(minput, moutput); 
-        //    render_node(root1);
 
         EndDrawing();
 
