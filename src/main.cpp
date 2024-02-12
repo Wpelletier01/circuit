@@ -1,238 +1,382 @@
 
+
+#include <algorithm>
+#include <cstdlib>
 #include <iostream>
+#include <vector>
+#include <string>
 #include <raylib.h>
-#include <raymath.h> 
 
-#include "core/map.h"
-#include "core/primitive.h"
-#include "graphic/declaration.h"
-#include "graphic/register.h"
+// Declaration ===
 
-// ==== Update and Logic
+const int       WIDTH = 1280;
+const int       HEIGHT = 720;
 
+const Color     NODE_COLOR = { 75, 94, 80, 255};
+const Vector2   NODE_SIZE = { 50.f, 10.f };
 
+const Color     WIRE_COLOR = BLACK;
+const float     WIRE_THICKNESS = 5.f;
 
-class App 
+const float     LINK_RADIUS =  8.f;
+const float     LINK_PADDING = 8.f;
+const float     LINK_SIZE = 16.f;
+const Color     LINK_COLOR = ORANGE;
+
+// UI
+const Color     BACKGROUND = { 64, 64, 64, 255};
+
+const float     MAP_IO_BG_SIZE = (LINK_RADIUS*2) + (LINK_RADIUS*2);
+
+// DATA TYPE ===
+
+enum LinkType 
 {
-  
-private:
+    MAP,
+    NODE_IO,
+    NODE, 
+};
 
-    class Register  reg;
-    class Map       map;
-    Camera2D        camera = {0};
+enum NodeType 
+{
+    LOGIC_GATE,
+    LOGIC_CIRCUIT,
+    MODULE,
+    
+};
 
-    void node_mouse_selection(size_t id, Rect* rect, std::vector<Circle*> circles, Text* text)
-    {    
+enum LogicGate
+{
+    AND,
+    OR,
+    XOR,
+    NOT,
+    NAND,
+    NOR,
+    XNOR
+};
+
+
+
+
+// === Utility
+
+std::string get_logic_gate_str(LogicGate lg)
+{
+    std::string output;
+
+    switch (lg) {
+
+        case LogicGate::AND:
+            output = "AND";
+            break;
+        case LogicGate::OR:
+            output = "OR";
+            break;
+        case LogicGate::XOR:
+            output = "XOR";
+            break;
+        case LogicGate::NOT:
+            output = "NOT";
+            break;
+        case LogicGate::NAND:
+            output = "NAND";
+            break;
+        case LogicGate::NOR:
+            output = "NOR";
+            break;
+        case LogicGate::XNOR:
+            output = "XNOR";
+            break;
+    }
+
+    return output;
+
+}
+
+float get_link_area_height(int nb_signals)
+{
+
+    float signal_part = nb_signals * LINK_SIZE;
+
+    float padding_part = 0.f;
+
+    // When only one, no padding space to calculate
+    if (nb_signals > 1) {
+        padding_part = (nb_signals - 1) * LINK_PADDING;
+    }
+
+    return signal_part + padding_part;
+}
+
+// ===
+
+
+
+struct Link 
+{
+    unsigned int        id;
+    unsigned int        node_id = 0;
+    LinkType            type;
      
-        Vector2 mpos = GetMousePosition();
-        Rectangle rpos = { rect->dinfo.position.x, rect->dinfo.position.y, rect->size.x, rect->size.y};
-
-        if (CheckCollisionPointRec(mpos, rpos) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            
-            rect->dinfo.selected = true;
-            
-            for ( auto circle : circles) {
-                circle->dinfo.selected = true;
-            }
-            
-            text->dinfo.selected = true;
-
-        } else if (rect->dinfo.selected && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-            
-            Vector2 offset = GetMouseDelta();
-
-            Vector2 bloc = Vector2Add(rect->dinfo.position,offset); 
-            
-            std::vector<Rectangle> others = reg.get_nodes_position(id);
-            Rectangle node_dimension = {bloc.x,bloc.y,rect->size.x,rect->size.y};
-            
-            bool collide = false;
-
-
-            for ( auto other : others) {
-                
-                if (CheckCollisionRecs(node_dimension, other)) {
-                    collide = true;
-                    break;
-                }
-            }
-            
-            if (!collide) {
-                rect->dinfo.position = bloc;
-
-                for ( auto circle : circles) {
-                    circle->dinfo.position = Vector2Add(circle->dinfo.position,offset);
-                }
-            
-                text->dinfo.position = Vector2Add(text->dinfo.position,offset);
- 
-            } 
-
-
-
-        } else {
-            rect->dinfo.selected = false;
-            
-            for ( auto circle : circles) {
-                circle->dinfo.selected = false;
-            }
-
-            text->dinfo.selected = false;
-        }
-
-    }
+    Rectangle           rect = {0.f, 0.f, LINK_SIZE, LINK_SIZE};
     
-    bool collide_w_signal(std::vector<Circle*> circles) 
+    std::vector<Link*>  parents;
+    std::vector<Link*>  children;
+
+    bool                selected = false;
+    bool                render = false;
+
+    
+    void set_position(Vector2 pos)
     {
-        
-        Vector2 mpos = GetMousePosition();
-
-        for (size_t i = 0; i < circles.size(); i++) {
-            
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointCircle(mpos,circles[i]->dinfo.position,circles[i]->radius)) {
-                std::cout << "you collide with a circle\n";
-                circles[i]->dinfo.selected = true;
-
-                return true;
-            } else if (circles[i]->dinfo.selected && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-                    
-                reg.register_wirring(circles[i]);
-
-                return true;
-            } else if (circles[i]->dinfo.selected) {
-                
-                reg.register_wirring(nullptr);
-                circles[i]->dinfo.selected = false;
-            }
-        }
-
-        return false;
-
-    }
-
-    void update_nodes()
-    {
-        std::vector<LGate> lgates = map.get_lgates();
-
-        for ( auto lgate : lgates ) {
-
-            Rect* rect = reg.get_rect_by_id(lgate.id);
-            std::vector<Circle*> circles = reg.get_circles_by_id(lgate.id);
-            Text* text = reg.get_text_by_id(lgate.id);
-            
-
-            if (!collide_w_signal(circles)) node_mouse_selection(lgate.id,rect,circles,text);
-        
-
-        }
-
-
+        rect.x = pos.x;
+        rect.y = pos.y;
     }
 
 
-public:
-    
-     
-    void update()
+    Vector2 get_position()
     {
-    
-        update_nodes();
-
-    }
-
-
-    void render()
-    {
-        // Render node 
-        for ( auto rect : reg.get_rects()) {
-            DrawRectangleV(rect.dinfo.position,rect.size,NODE_COLOR);
-        }
-
-        for ( auto circle : reg.get_circles()) {
-            DrawCircleV(circle.dinfo.position,circle.radius,SIGNAL_COLOR);
-        }
-
-        for ( auto text : reg.get_texts()) {
-            DrawTextEx(GetFontDefault(),text.data.c_str(),text.dinfo.position,text.size.y,5.f,WHITE);
-        }
-
-        // ===
-            
-        // Render Wirring signal
-        
-        Circle* from_wire = reg.get_wirring();
-        
-        if (from_wire) {
-            DrawLineBezier(from_wire->dinfo.position, GetMousePosition(), 5.f, BLACK);
-        } 
-    
-
-    }
-    
-
-    void add_classic_logic_gate(LGateType t, Vector2 start)
-    {
-        
-        size_t id = map.add_lgate(t);
-        
-        switch (t) {
-            
-            case LGateType::AND:
-                reg.register_node(id, "AND", 2, 1, start);
-                break;
-            case LGateType::OR:
-                reg.register_node(id, "OR", 2, 1, start);
-                break;
-            case LGateType::XOR:
-                reg.register_node(id, "XOR", 2, 1, start);
-                break;
-            case LGateType::NOT:
-                reg.register_node(id, "NOT", 1, 1, start);
-                break;
-            case LGateType::NAND:
-                reg.register_node(id, "NAND", 2, 1, start);
-                break;
-            case LGateType::NOR:
-                reg.register_node(id, "NOR", 2, 1, start);
-                break;
-            case LGateType::XNOR:
-                reg.register_node(id, "XNOR", 2, 1, start);
-                break;
-        }
-    
+        return { rect.x, rect.y};
     }
 
 };
+
+
+
+struct MapIO
+{
+     
+    std::vector<Link*>  links;
+    
+    Rectangle           background;
+
+    
+    MapIO(Vector2 position)
+    {
+        background = { position.x, position.y, MAP_IO_BG_SIZE, HEIGHT};
+    
+    }
+
+    void update_io_position()
+    {
+
+        float height = (HEIGHT / 2.f) - (get_link_area_height(links.size()) / 2.f);
+
+        for ( auto link : links) {
+            
+            link->rect.y = height;
+
+            height += LINK_PADDING + LINK_SIZE;
+
+        }
+        
+    }
+
+    void add_io(Link *io)
+    {
+        
+        io->type = LinkType::MAP;
+
+        io->rect.x = background.x + LINK_PADDING;
+
+        links.push_back(io);
+
+        update_io_position();
+    }
+
+    void render()
+    {
+        
+        DrawRectangleRec(background, BACKGROUND); 
+
+
+    }
+
+    void draw_default_link()
+    {
+        
+        DrawRectangleV({background.x + LINK_PADDING, (HEIGHT/2.f) - (LINK_SIZE/2.f)},{LINK_SIZE,LINK_SIZE},LINK_COLOR);
+    }
+
+};
+
+
+
+
+
+// ===
+
+class Register 
+{
+
+private:
+    
+    unsigned int lid = 1;
+    unsigned int nid = 1;
+
+public:
+
+
+    Link* new_link()
+    {
+        
+        Link *link = new Link;
+
+        lid++;
+
+        link->id = lid - 1;
+
+        return link;
+    }
+
+
+};
+
+
+// Updating === 
+
+
+void update(struct MapIO min, struct MapIO mout)
+{
+    
+
+
+}
+
+// Rendering ===
+
+
+
+void render_link(Link* link)
+{
+    if (link->type == LinkType::MAP) {
+        
+        DrawRectangleRec(link->rect,LINK_COLOR);
+        for (auto child : link->children) {
+            DrawLineBezier(link->get_position(),child->get_position(),5.f,WHITE);
+            render_link(child);
+        }
+
+
+    } else if (link->type == LinkType::NODE) {
+        
+        size_t bigger = std::max(link->children.size(),link->parents.size());
+        Rectangle rect = { 400.f - LINK_RADIUS, 200.f - LINK_RADIUS, 55.f, get_link_area_height(bigger)};
+        
+        DrawRectangleRec(rect,NODE_COLOR);
+
+        // Render Node Link after the background block
+        for (auto input : link->parents) {
+            if (input->type == LinkType::NODE_IO) DrawRectangleRec(input->rect,LINK_COLOR);
+        }
+
+        for (auto output : link->children) {
+            if (output->type == LinkType::NODE_IO) DrawRectangleRec(output->rect, LINK_COLOR);
+            
+            render_link(output);
+        }
+
+        
+    } else {
+        for (auto child : link->children) {
+            if (child->type != LinkType::NODE) DrawLineBezier(link->get_position(),child->get_position(),5.f,WHITE);
+            render_link(child);
+        }
+    }
+
+
+
+}
+
+
+void render_ui(struct MapIO minput, struct MapIO moutput)
+{
+    minput.render();
+    moutput.render();
+
+}
+
+void render(struct MapIO minput, struct MapIO moutput)
+{
+    render_ui(minput, moutput);
+    
+    if (moutput.links.size() < 1) moutput.draw_default_link();
+
+    for (auto input : minput.links)  {
+        render_link(input);
+    }
+
+
+
+}
+
 
 
 // ===
 
 int main(void)
 {
- 
-    App app;
+    
+    class Register reg;
+     
 
-    app.add_classic_logic_gate(LGateType::OR, { 300.f, 300.f}); 
-    app.add_classic_logic_gate(LGateType::NOT, { 500.f , 200.f});
+    struct MapIO minput({0.f, 0.f});
+    struct MapIO moutput({WIDTH - MAP_IO_BG_SIZE, 0.f});
+
+    minput.add_io(reg.new_link());
+    moutput.add_io(reg.new_link());
+
+    // test
+    Link *node_input = reg.new_link();
+    Link *node = reg.new_link();
+    Link *node_output = reg.new_link();
+
+
+    minput.links[0]->children.push_back(node_input);
+    moutput.links[0]->parents.push_back(node_output);
+    
+    node_input->type = LinkType::NODE_IO;
+    node_input->set_position({ 400.f, 200.f});
+    node_input->parents.push_back(minput.links[0]);
+    node_input->children.push_back(node);
+
+
+    node->type = LinkType::NODE;
+    node->set_position({ 420.f, 200.f});
+    node->parents.push_back(node_input);
+    node->children.push_back(node_output);
+    
+
+    node_output->type = LinkType::NODE_IO;
+    node_output->set_position({ 440.f, 200.f});
+    node_output->parents.push_back(node);
+    node_output->children.push_back(moutput.links[0]);
+
 
     InitWindow(WIDTH, HEIGHT, "Circuit");
 
     while (!WindowShouldClose()) {
-       
-        app.update();
 
-        
+        // update
+       // update(root1);
+        // ===
+
         BeginDrawing();
-            
+
             ClearBackground(GRAY);
-            
-            app.render();
+            render(minput, moutput); 
+        //    render_node(root1);
 
         EndDrawing();
 
     }
 
     CloseWindow();
+    
+
 
     return 0;
 }
+
+

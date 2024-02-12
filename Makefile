@@ -1,7 +1,7 @@
 
 
 CXX := g++
-CXXFLAGS := -std=c++11 -g -Wall -Wno-unused -Wunused-function
+CXXFLAGS := -g -Wall -Wno-unused -Wunused-function
 LFLAGS = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 
 TARGET := circuit
