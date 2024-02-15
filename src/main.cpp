@@ -175,15 +175,18 @@ struct Link
         }
     }
 
-    bool is_not_connected()
+    bool is_connected()
     {
-        if (type == LinkType::NODE_IO) {
-
-            return !children.empty() && !parents.empty();
+        
+        for (auto child : children) {
+            if (child->type != LinkType::NODE && child->type != LinkType::IN_DRAW) return true;
         }
         
-        // the rest is considered connected for now
-        return true;
+        for (auto parent : parents) {
+            if (parent->type != LinkType::NODE && parent->type != LinkType::IN_DRAW) return true;
+        }
+        
+        return false;
     }
 
     bool has_a_wire_draw()
@@ -388,7 +391,7 @@ void mouse_input(Link *link)
         else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && link->selected) move_node(link,GetMouseDelta());
         else link->selected = false;
 
-    } else if (link->type == LinkType::NODE_IO && link->is_not_connected()) {
+    } else if (link->type == LinkType::NODE_IO && !link->is_connected()) {
         
         Vector2 mpos = GetMousePosition();
 
@@ -460,19 +463,33 @@ void render_link(Link* link)
 
         // Render Node Link after the background block
         for (auto input : link->parents) {
+            
             if (input->type == LinkType::NODE_IO) DrawRectangleRec(input->rect,OFF_COLOR);
+            
+            if (input->has_a_wire_draw()) {
+                DrawLineBezier(get_rect_center(input->rect),input->parents[0]->get_position(),WIRE_THICKNESS,BLACK);
+            }
+
         }
 
         for (auto output : link->children) {
+
             if (output->type == LinkType::NODE_IO) DrawRectangleRec(output->rect, OFF_COLOR);
             
-            render_link(output);
+            if (output->has_a_wire_draw()) {
+                DrawLineBezier(get_rect_center(output->rect),output->children[0]->get_position(),WIRE_THICKNESS,BLACK);
+
+            } else {
+                render_link(output);
+            }
         }
 
         
     } else {
+        
         for (auto child : link->children) {
             if (child->type != LinkType::NODE) DrawLineBezier(get_rect_center(link->rect),get_rect_center(child->rect),WIRE_THICKNESS,OFF_COLOR);
+            
 
             render_link(child);
         }
@@ -490,15 +507,14 @@ void render_ui(struct MapIO minput, struct MapIO moutput)
 
 }
 
-void render(struct MapIO minput, struct MapIO moutput)
+void render(struct MapIO minput, struct MapIO moutput, std::vector<Link*> nodes)
 {
     render_ui(minput, moutput);
     
     if (moutput.links.size() < 1) moutput.draw_default_link();
-
-    for (auto input : minput.links)  {
-        render_link(input);
-    }
+    
+    for ( auto input : minput.links) render_link(input);
+    
 
 
 
@@ -535,31 +551,51 @@ void test_mouse_input(Link *node)
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mpos,node->rect)) node->selected = true;
     else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && node->selected) {
         move_node(node,GetMouseDelta());
-        std::cout << "move nowww\n";
     } else node->selected = false;
 
 
     for (auto child : node->children ) {
         
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mpos,child->rect)) child->selected = true;
-        else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && child->selected && !child->is_not_connected()) {
+        else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && child->selected && !child->is_connected()) {
             
-            Link* tmp = new Link;
+            std::cout << child->children.size() << "\n";
             
             if (!child->has_a_wire_draw()) {
+                std::cout << "bruh\n";
+                Link* tmp = new Link; 
                 tmp->type = LinkType::IN_DRAW;
                 tmp->id = 0;
                 tmp->set_position(mpos);
                 tmp->add_child(child);
-                child->parents.push_back(tmp);
+                child->children.push_back(tmp);
                 
-            } else child->parents[0]->set_position(mpos);
+            } else {
 
+                for (auto other : child->children) {
+                    
+                    if (other->type == LinkType::IN_DRAW) {
+                        other->offset = GetMouseDelta(); 
+                        other->mov();
+                        other->reset_offset();
+                    }
+
+                }
+            }
+
+            
+            
 
         } else {
             child->selected = false;
-            if (child->has_a_wire_draw()) free(child->parents[0]);
             
+            if (child->has_a_wire_draw()) {
+                free(child->children[0]);
+                child->children.erase(child->children.begin());
+            }
+            
+        
+
         }
     }
 
@@ -568,7 +604,7 @@ void test_mouse_input(Link *node)
     for (auto parent : node->parents ) {
         
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mpos,parent->rect)) parent->selected = true;
-        else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && parent->selected && !parent->is_not_connected()) {
+        else if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && parent->selected && !parent->is_connected()) {
         
             if (!parent->has_a_wire_draw()) {
                 
@@ -577,24 +613,27 @@ void test_mouse_input(Link *node)
                 tmp->type = LinkType::IN_DRAW;
                 tmp->set_position(mpos);
                 tmp->add_parent(parent);
-                parent->children.push_back(tmp);
+                parent->parents.push_back(tmp);
                 
             } else {
-                
-                for (auto child : parent->children) {
-                    if (child->type == LinkType::IN_DRAW) {
-                        std::cout << "draw pen now at x: " << mpos.x << " y: " << mpos.y << "\n";
-                        child->set_position(mpos); 
+                for (auto other : parent->parents) {
+                    if (other->type == LinkType::IN_DRAW) {
+                        other->offset = GetMouseDelta(); 
+                        other->mov();
+                        other->reset_offset();
                     }
                 }
 
             }
         } else { 
             parent->selected = false;
+            
+            if (parent->has_a_wire_draw()) {
 
-                for (auto child : parent->children) {
-                    if (child->type == LinkType::IN_DRAW) free(child); 
-                }
+                free(parent->parents[0]); 
+                parent->parents.erase(parent->parents.begin());
+
+            }
             
         }
     }
@@ -636,6 +675,7 @@ int main(void)
     Link *node = reg.new_link();
     Link *node_output = reg.new_link();
     Link *empty_link = reg.new_link();
+    Link *empty_link2 = reg.new_link();
 
     minput.links[0]->add_child(node_input);
     moutput.links[0]->add_parent(node_output);
@@ -653,6 +693,7 @@ int main(void)
     node->set_position({ 416.f, 200.f});
     node->set_size(LINK_SIZE, LINK_SIZE);
 
+
     node->add_parent(node_input);
     node->add_parent(empty_link);
 
@@ -664,7 +705,12 @@ int main(void)
     node_output->set_position({ 432.f, 200.f});
     node_output->add_parent(node);
     node_output->add_child(moutput.links[0]);
-
+    
+    empty_link2->type = LinkType::NODE_IO;
+    empty_link2->set_position({432.f, 216.f + LINK_PADDING});
+    empty_link2->add_parent(node);
+    
+    node->add_child(empty_link2);
     
     std::vector<Link*> nodes = { node }; 
 
@@ -682,7 +728,7 @@ int main(void)
         BeginDrawing();
 
             ClearBackground(GRAY);
-            render(minput, moutput); 
+            render(minput, moutput, nodes); 
 
         EndDrawing();
 
